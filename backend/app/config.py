@@ -5,10 +5,13 @@ from urllib.parse import urlparse
 load_dotenv()
 
 # Database Configuration
+# For local development, fall back to a sqlite file if DATABASE_URL is not set.
+# This avoids hard-failing when the developer doesn't have a Postgres URL configured.
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+    # Fallback to a local sqlite DB for quick local development/testing
+    DATABASE_URL = "sqlite:///./dev.db"
+    # Note: sqlite URLs don't need sslmode adjustments below
 
 # Ensure the URL format is correct for SQLAlchemy
 if DATABASE_URL.startswith("postgres://"):
@@ -35,9 +38,12 @@ API_VERSION = "0.0.1"
 API_DESCRIPTION = "AI-powered forensic analysis API for telecommunications data"
 
 # CORS Configuration
+# Include the ports commonly used by this project's frontend during development
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
