@@ -213,6 +213,9 @@ function Analysis() {
   const [chatError, setChatError] = useState('')
   const [caseMessage, setCaseMessage] = useState('')
   const [caseMessageType, setCaseMessageType] = useState('')
+    const [inlineReportVisible, setInlineReportVisible] = useState(false)
+    const [inlineReportLoading, setInlineReportLoading] = useState(false)
+    const inlineReportSectionRef = useRef(null)
   const [savedCases, setSavedCases] = useState([])
   const [caseModalOpen, setCaseModalOpen] = useState(false)
   const [casesLoading, setCasesLoading] = useState(false)
@@ -1149,20 +1152,84 @@ function Analysis() {
         )}
 
         {activeTab === 'chat' && (
-          <ChatPage
-            COMMANDS={COMMANDS}
-            handleCommandClick={handleCommandClick}
-            chatHistory={chatHistory}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            handleSendChat={handleSendChat}
-            startSpeechToText={startSpeechToText}
-            isListening={isListening}
-            chatLoading={chatLoading}
-            chatError={chatError}
-            onBack={() => setActiveTab('upload')}
-            onGenerateReport={() => setActiveTab('reports')}
-          />
+            <>
+              <ChatPage
+                COMMANDS={COMMANDS}
+                handleCommandClick={handleCommandClick}
+                chatHistory={chatHistory}
+                chatInput={chatInput}
+                setChatInput={setChatInput}
+                handleSendChat={handleSendChat}
+                startSpeechToText={startSpeechToText}
+                isListening={isListening}
+                chatLoading={chatLoading}
+                chatError={chatError}
+                onBack={() => setActiveTab('upload')}
+                onGenerateReport={async () => {
+                  // Generate and show the report inline below the chat.
+                  // If there's no chat response yet, do nothing and show an error message.
+                  if (!chatResponse) {
+                    setCaseMessage('No analysis available to generate a report. Please run an analysis first.')
+                    setCaseMessageType('error')
+                    return
+                  }
+
+                  try {
+                    setInlineReportLoading(true)
+                    // The report content is already present in chatResponse/state.
+                    // We simply show the ReportsPage inline using the same props.
+                    setInlineReportVisible(true)
+                    // wait a tick then scroll to the report section
+                    setTimeout(() => {
+                      if (inlineReportSectionRef.current) {
+                        inlineReportSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
+                    }, 100)
+                  } finally {
+                    setInlineReportLoading(false)
+                  }
+                }}
+              />
+
+              {/* Inline report section (initially hidden) */}
+              <div id="report-section" ref={inlineReportSectionRef} style={{ marginTop: '18px' }}>
+                {inlineReportLoading && (
+                  <div className="analysis-card">
+                    <h3>Generating report...</h3>
+                  </div>
+                )}
+
+                {inlineReportVisible && (
+                  <ReportsPage
+                    chatResponse={chatResponse}
+                    caseMessage={caseMessage}
+                    caseMessageType={caseMessageType}
+                    localizedSections={localizedSections}
+                    hasStructuredSections={hasStructuredSections}
+                    sectionLabels={sectionLabels}
+                    selectedLanguage={selectedLanguage}
+                    setSelectedLanguage={setSelectedLanguage}
+                    handleSaveCase={handleSaveCase}
+                    handleOpenCaseModal={handleOpenCaseModal}
+                    handleOpenHistoryModal={handleOpenHistoryModal}
+                    handleExportPdf={handleExportPdf}
+                    handleSpeakLastResponse={handleSpeakLastResponse}
+                    handleStopSpeaking={handleStopSpeaking}
+                    reportSpeechText={reportSpeechText}
+                    resultPayload={resultPayload}
+                    graphData={graphData}
+                    suspectNumbers={suspectNumbers}
+                    timelineData={timelineData}
+                    timelineIndex={timelineIndex}
+                    setTimelineIndex={setTimelineIndex}
+                    mapRows={mapRows}
+                    filteredTableData={filteredTableData}
+                    reportRef={reportRef}
+                    languageOptions={LANGUAGE_OPTIONS}
+                  />
+                )}
+              </div>
+            </>
         )}
 
         {activeTab === 'reports' && (
