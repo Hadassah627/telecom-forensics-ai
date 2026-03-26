@@ -30,7 +30,12 @@ function getCoordsFromLocation(location = '') {
 function buildTowerPoints(rows = []) {
   return rows
     .map((row) => {
-      const coords = getCoordsFromLocation(row.location)
+      const lat = row.lat ?? row.latitude
+      const lng = row.lng ?? row.longitude
+      const coords =
+        Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+          ? [Number(lat), Number(lng)]
+          : getCoordsFromLocation(row.location)
       if (!coords) {
         return null
       }
@@ -44,8 +49,28 @@ function buildTowerPoints(rows = []) {
     .filter(Boolean)
 }
 
-function MapView({ rows = [] }) {
-  const points = useMemo(() => buildTowerPoints(rows), [rows])
+function createIcon(color) {
+  return L.divIcon({
+    className: 'custom-map-marker',
+    html: `<span style="display:inline-block;width:14px;height:14px;border-radius:999px;border:2px solid #fff;background:${color};box-shadow:0 0 8px rgba(15,23,42,.6)"></span>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -8],
+  })
+}
+
+const CRIME_ICON = createIcon('#ef4444')
+const SUSPECT_ICON = createIcon('#f59e0b')
+const NORMAL_ICON = createIcon('#22c55e')
+
+function MapView({ towerData = null, rows = [], crimeTowerId = null, suspectTowers = [] }) {
+  const sourceRows = Array.isArray(towerData?.towers) ? towerData.towers : rows
+  const points = useMemo(() => buildTowerPoints(sourceRows), [sourceRows])
+  const suspectSet = useMemo(
+    () => new Set((suspectTowers || []).map((item) => String(item || '').toLowerCase())),
+    [suspectTowers]
+  )
+  const crimeTowerKey = String(crimeTowerId || '').toLowerCase()
 
   if (!points.length) {
     return (
@@ -69,7 +94,17 @@ function MapView({ rows = [] }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {points.map((point, idx) => (
-            <Marker key={`${point.towerId}-${idx}`} position={point.coords}>
+            <Marker
+              key={`${point.towerId}-${idx}`}
+              position={point.coords}
+              icon={
+                String(point.towerId || '').toLowerCase() === crimeTowerKey
+                  ? CRIME_ICON
+                  : suspectSet.has(String(point.towerId || '').toLowerCase())
+                    ? SUSPECT_ICON
+                    : NORMAL_ICON
+              }
+            >
               <Popup>
                 <strong>{point.towerId}</strong>
                 <br />
@@ -79,7 +114,7 @@ function MapView({ rows = [] }) {
               </Popup>
             </Marker>
           ))}
-          {path.length > 1 && <Polyline positions={path} color="#1d4ed8" weight={4} opacity={0.8} />}
+          {path.length > 1 && <Polyline positions={path} color="#38bdf8" weight={4} opacity={0.85} />}
         </MapContainer>
       </div>
     </div>

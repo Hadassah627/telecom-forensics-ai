@@ -8,6 +8,7 @@ import DynamicTable from '../components/DynamicTable'
 import ForceGraphView from '../components/ForceGraphView'
 import HistoryModal from '../components/HistoryModal'
 import MapView from '../components/MapView'
+import RiskAlert from '../components/RiskAlert'
 import ReportCard from '../components/ReportCard'
 import SectionBlock from '../components/SectionBlock'
 import TimelineSlider from '../components/TimelineSlider'
@@ -905,15 +906,6 @@ function Analysis() {
   }
 
   const resultPayload = chatResponse?.result || null
-  const graphData = useMemo(() => {
-    if (!resultPayload) {
-      return null
-    }
-    if (Array.isArray(resultPayload.nodes) && Array.isArray(resultPayload.edges)) {
-      return { nodes: resultPayload.nodes, edges: resultPayload.edges }
-    }
-    return null
-  }, [resultPayload])
 
   const tableData = useMemo(() => {
     if (!resultPayload) {
@@ -943,13 +935,15 @@ function Analysis() {
   const timelinePoints = useMemo(() => {
     const buckets = tableData
       .map((row) => ({
-        raw: extractTimeField(row),
+        time: extractTimeField(row),
+        tower: row.tower_id || row.tower || '-',
+        location: row.location || '-',
         epoch: toEpoch(extractTimeField(row)),
       }))
-      .filter((item) => item.raw && item.epoch !== null)
+      .filter((item) => item.time && item.epoch !== null)
       .sort((a, b) => a.epoch - b.epoch)
 
-    return Array.from(new Map(buckets.map((item) => [item.epoch, item.raw])).values())
+    return Array.from(new Map(buckets.map((item) => [item.epoch, item])).values())
   }, [tableData])
 
   useEffect(() => {
@@ -971,8 +965,8 @@ function Analysis() {
       return tableData
     }
 
-    const activeTimeValue = timelinePoints[Math.min(timelineIndex, timelinePoints.length - 1)]
-    const activeEpoch = toEpoch(activeTimeValue)
+    const activePoint = timelinePoints[Math.min(timelineIndex, timelinePoints.length - 1)]
+    const activeEpoch = activePoint?.epoch ?? null
     if (activeEpoch === null) {
       return tableData
     }
@@ -992,6 +986,61 @@ function Analysis() {
     }
     return tableData
   }, [filteredTableData, tableData])
+
+  const suspectNumbers = useMemo(() => {
+    if (!Array.isArray(resultPayload?.suspects)) {
+      return []
+    }
+    return resultPayload.suspects.map((item) => String(item))
+  }, [resultPayload])
+
+  const timelineData = timelinePoints.map((item) => ({
+    time: item.time,
+    tower: item.tower,
+    location: item.location,
+  }))
+
+  const graphData = useMemo(() => {
+    if (!resultPayload) {
+      return null
+    }
+
+    if (Array.isArray(resultPayload.nodes) && Array.isArray(resultPayload.edges)) {
+      return { nodes: resultPayload.nodes, edges: resultPayload.edges }
+    }
+
+    if (Array.isArray(mapRows) && mapRows.length > 1) {
+      const nodes = []
+      const seen = new Set()
+      const edges = []
+
+      mapRows.forEach((row, index) => {
+        const tower = String(row.tower_id || row.tower || '')
+        if (!tower) {
+          return
+        }
+        if (!seen.has(tower)) {
+          seen.add(tower)
+          nodes.push({ id: tower })
+        }
+        if (index > 0) {
+          const previous = String(mapRows[index - 1].tower_id || mapRows[index - 1].tower || '')
+          if (previous && previous !== tower) {
+            edges.push({ source: previous, target: tower, weight: 1 })
+          }
+        }
+      })
+
+      if (nodes.length && edges.length) {
+        return { nodes, edges }
+      }
+    }
+
+    return null
+  }, [resultPayload, mapRows])
+
+  const crimeTowerId = resultPayload?.crime?.tower || null
+  const suspectTowers = resultPayload?.suspect_towers || []
 
   const hasStructuredSections =
     localizedSections.keyObservations.length > 0 ||
@@ -1195,20 +1244,48 @@ function Analysis() {
                 </div>
               )}
 
+              <RiskAlert
+                riskLevel={resultPayload?.risk_level || 'LOW'}
+                reasons={resultPayload?.risk_reason || []}
+              />
+
+              {suspectNumbers.length > 0 && (
+                <div className="suspect-badges">
+                  <p className="suspect-title">Suspect Highlights</p>
+                  <div className="suspect-badge-wrap">
+                    {suspectNumbers.map((item) => (
+                      <span key={item} className="suspect-badge">{item}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <TimelineSlider
-                timeline={timelinePoints}
+                timeline={timelineData}
                 activeIndex={timelineIndex}
                 onChange={setTimelineIndex}
               />
 
-              <MapView rows={mapRows} />
+              <MapView
+                towerData={{ towers: mapRows }}
+                crimeTowerId={crimeTowerId}
+                suspectTowers={suspectTowers}
+              />
 
-              {graphData && <ForceGraphView nodes={graphData.nodes} edges={graphData.edges} />}
+              {graphData && (
+                <ForceGraphView
+                  nodes={graphData.nodes}
+                  edges={graphData.edges}
+                  mainNumber={resultPayload?.number || ''}
+                  suspectNumbers={suspectNumbers}
+                />
+              )}
 
               {Array.isArray(filteredTableData) && filteredTableData.length > 0 && (
                 <DynamicTable
                   title={Array.isArray(resultPayload?.movement) ? 'Movement Timeline' : 'Data Table'}
                   data={filteredTableData}
+                  suspectNumbers={suspectNumbers}
                 />
               )}
             </ReportCard>

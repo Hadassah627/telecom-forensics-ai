@@ -9,12 +9,23 @@ function formatTimeLabel(value) {
   return date.toLocaleString()
 }
 
+function getTimelineTime(item) {
+  if (item && typeof item === 'object') {
+    return item.time || item.timestamp || item.value || null
+  }
+  return item
+}
+
 function TimelineSlider({ timeline = [], activeIndex = 0, onChange }) {
   if (!Array.isArray(timeline) || timeline.length <= 1) {
     return null
   }
 
   const safeIndex = Math.max(0, Math.min(activeIndex, timeline.length - 1))
+
+  const activeItem = timeline[safeIndex]
+  const activeTower = activeItem && typeof activeItem === 'object' ? activeItem.tower || activeItem.tower_id : null
+  const activeLocation = activeItem && typeof activeItem === 'object' ? activeItem.location : null
 
   return (
     <div className="result-block timeline-block">
@@ -29,10 +40,15 @@ function TimelineSlider({ timeline = [], activeIndex = 0, onChange }) {
         className="timeline-slider"
       />
       <div className="timeline-labels">
-        <span>{formatTimeLabel(timeline[0])}</span>
-        <strong>{formatTimeLabel(timeline[safeIndex])}</strong>
-        <span>{formatTimeLabel(timeline[timeline.length - 1])}</span>
+        <span>{formatTimeLabel(getTimelineTime(timeline[0]))}</span>
+        <strong>{formatTimeLabel(getTimelineTime(activeItem))}</strong>
+        <span>{formatTimeLabel(getTimelineTime(timeline[timeline.length - 1]))}</span>
       </div>
+      {(activeTower || activeLocation) && (
+        <p className="timeline-meta">
+          Tower: <strong>{activeTower || '-'}</strong> | Location: <strong>{activeLocation || '-'}</strong>
+        </p>
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 
-function ForceGraphView({ nodes = [], edges = [] }) {
+function ForceGraphView({ nodes = [], edges = [], mainNumber = '', suspectNumbers = [] }) {
   const containerRef = useRef(null)
   const [dimensions, setDimensions] = useState({ width: 760, height: 360 })
 
@@ -19,24 +19,40 @@ function ForceGraphView({ nodes = [], edges = [] }) {
   }, [])
 
   const graphData = useMemo(
-    () => ({
-      nodes: (nodes || []).map((node, idx) => ({
-        id: String(node.id),
-        label: String(node.id),
-        colorIndex: idx % 6,
-      })),
+    () => {
+      const suspectSet = new Set((suspectNumbers || []).map((n) => String(n)))
+      return {
+      nodes: (nodes || []).map((node, idx) => {
+        const nodeId = String(node.id)
+        return {
+          id: nodeId,
+          label: String(node.id),
+          colorIndex: idx % 6,
+          isMain: mainNumber && nodeId === String(mainNumber),
+          isSuspect: suspectSet.has(nodeId),
+        }
+      }),
       links: (edges || []).map((edge) => ({
         source: String(edge.source),
         target: String(edge.target),
         value: Number(edge.weight || 1),
       })),
-    }),
-    [nodes, edges]
+    }
+    },
+    [nodes, edges, mainNumber, suspectNumbers]
   )
 
   const nodeColors = ['#22c55e', '#06b6d4', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899']
 
-  const getNodeColor = (node) => nodeColors[node.colorIndex % nodeColors.length]
+  const getNodeColor = (node) => {
+    if (node.isMain) {
+      return '#facc15'
+    }
+    if (node.isSuspect) {
+      return '#ef4444'
+    }
+    return nodeColors[node.colorIndex % nodeColors.length]
+  }
 
   const toCompactLabel = (value) => {
     const text = String(value || '')
@@ -78,13 +94,18 @@ function ForceGraphView({ nodes = [], edges = [] }) {
           width={dimensions.width}
           height={dimensions.height}
           graphData={graphData}
-          cooldownTicks={120}
-          linkDirectionalParticles={2}
-          linkDirectionalParticleWidth={2}
+          cooldownTicks={180}
+          d3VelocityDecay={0.24}
+          enableZoomInteraction
+          enablePanInteraction
+          enableNodeDrag
+          linkDirectionalParticles={3}
+          linkDirectionalParticleWidth={2.5}
+          linkDirectionalParticleSpeed={(link) => (Number(link.value) > 1 ? 0.008 : 0.004)}
           linkColor={() => '#7dd3fc'}
           nodeColor={getNodeColor}
           nodeLabel="label"
-          nodeVal={(node) => 10}
+          nodeVal={(node) => (node.isMain ? 14 : node.isSuspect ? 12 : 10)}
           nodeCanvasObject={renderNodeLabel}
           nodeCanvasObjectMode={() => 'after'}
           backgroundColor="rgba(2, 6, 23, 0.85)"

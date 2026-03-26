@@ -399,6 +399,85 @@ main {
   color: #f8fafc;
 }
 
+.timeline-meta {
+  margin-top: 0.45rem;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.risk-alert {
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  margin-top: 0.8rem;
+  margin-bottom: 0.8rem;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(127, 29, 29, 0.24);
+}
+
+.risk-alert.high {
+  border-color: rgba(248, 113, 113, 0.8);
+  background: rgba(127, 29, 29, 0.35);
+}
+
+.risk-alert.medium {
+  border-color: rgba(251, 191, 36, 0.7);
+  background: rgba(120, 53, 15, 0.28);
+}
+
+.risk-alert.low {
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(21, 128, 61, 0.22);
+}
+
+.risk-alert-title {
+  color: #fee2e2;
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+}
+
+.risk-alert.medium .risk-alert-title {
+  color: #fef3c7;
+}
+
+.risk-alert.low .risk-alert-title {
+  color: #dcfce7;
+}
+
+.risk-alert-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #f8fafc;
+}
+
+.suspect-badges {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.suspect-title {
+  color: #fecaca;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.suspect-badge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.suspect-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.28);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fee2e2;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
 .map-wrap {
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 10px;
@@ -749,6 +828,11 @@ main {
   font-size: 0.9rem;
 }
 
+.suspect-cell {
+  font-weight: 800;
+  color: #fca5a5;
+}
+
 .result-table th {
   background: #f8fafc;
   color: #1e293b;
@@ -760,6 +844,11 @@ main {
   border-radius: 8px;
   background: #f8fafc;
   padding: 0.5rem;
+}
+
+.custom-map-marker {
+  background: transparent;
+  border: 0;
 }
 
 .graph-svg {

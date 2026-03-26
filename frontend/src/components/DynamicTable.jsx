@@ -1,4 +1,4 @@
-function DynamicTable({ data, title }) {
+function DynamicTable({ data, title, suspectNumbers = [] }) {
   if (!Array.isArray(data) || data.length === 0) {
     return <p className="muted">No rows available.</p>
   }
@@ -9,6 +9,15 @@ function DynamicTable({ data, title }) {
       return set
     }, new Set())
   )
+
+  const suspectSet = new Set((suspectNumbers || []).map((item) => String(item)))
+
+  const isSuspectCell = (value) => {
+    if (value === null || value === undefined) {
+      return false
+    }
+    return suspectSet.has(String(value))
+  }
 
   return (
     <div className="result-block">
@@ -26,7 +35,12 @@ function DynamicTable({ data, title }) {
             {data.map((row, idx) => (
               <tr key={idx}>
                 {columns.map((column) => (
-                  <td key={`${idx}-${column}`}>{formatValue(row?.[column])}</td>
+                  <td
+                    key={`${idx}-${column}`}
+                    className={isSuspectCell(row?.[column]) ? 'suspect-cell' : ''}
+                  >
+                    {formatValue(row?.[column])}
+                  </td>
                 ))}
               </tr>
             ))}
