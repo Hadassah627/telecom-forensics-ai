@@ -156,6 +156,14 @@ button {
   background-color: #7f8c8d;
 }
 
+/* small button variant used for compact inline actions */
+.btn-small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
 main {
   flex: 1;
   padding: 2rem;
@@ -262,8 +270,25 @@ main {
 
 /* Analysis Page Styles */
 .analysis-page h1 {
-  color: #2c3e50;
   margin-bottom: 1.5rem;
+  font-size: 2rem;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  /* subtle gradient headline using app colors */
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* gentle depth for legibility on dark background */
+  text-shadow: 0 8px 20px rgba(6, 12, 30, 0.45);
+}
+
+@media (max-width: 900px) {
+  .analysis-page h1 {
+    font-size: 1.5rem;
+  }
 }
 
 .analysis-topbar {

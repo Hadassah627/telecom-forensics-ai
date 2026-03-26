@@ -1,0 +1,102 @@
+.tfai-sidebar {
+  /* Fixed, flush-left sidebar so it sits at the very left of the viewport (below top nav).
+     This makes the left panel visually identical to the reference where content sits to the right. */
+  position: fixed;
+  left: 0;
+  top: 72px; /* keep under top navigation */
+  height: calc(100vh - 72px);
+  width: 240px; /* slightly wider to match reference spacing */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px;
+  border-radius: 0 12px 12px 0; /* flush to left edge */
+  background: linear-gradient(180deg, #0B1120 0%, #111827 100%);
+  border-right: 1px solid rgba(255,255,255,0.04);
+  box-shadow: 0 12px 40px rgba(2, 8, 24, 0.32);
+  z-index: 900;
+}
+
+/* When elevated bottom is used, place bottom controls closer to nav (don't push to absolute bottom) */
+.tfai-sidebar.elevate-bottom {
+  justify-content: flex-start;
+}
+
+.tfai-sidebar.elevate-bottom .sidebar-bottom {
+  margin-top: 18px; /* small spacing below nav */
+}
+
+.tfai-sidebar .sidebar-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px; /* reduce gap below logo so nav starts closer */
+}
+
+.logo-wrap { display:flex; gap:8px; align-items:center }
+.logo-mark { width:36px; height:36px; display:flex; align-items:center; justify-content:center }
+.logo-text { color:#e6f3ff; font-weight:800; font-size:0.95rem; line-height:1; }
+
+.sidebar-nav { display:flex; flex-direction:column; gap:8px; margin-top:6px }
+
+.sidebar-item {
+  display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; color:#9CA3AF; background:transparent; border:1px solid transparent; cursor:pointer; font-weight:700; text-align:left; transition: all 200ms ease;
+}
+
+.sidebar-item .icon { width:20px; height:20px; color: #9fc7e6 }
+.sidebar-item .item-label { font-size:0.92rem; color: var(--sidebar-text, #E5E7EB) }
+
+.sidebar-item:hover {
+  background: #1E293B; /* hover highlight */
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(2,10,30,0.45);
+  border-color: rgba(255,255,255,0.03);
+}
+
+.sidebar-item.active {
+  background: linear-gradient(90deg, rgba(88, 72, 219, 0.14), rgba(43,128,255,0.08));
+  border-left: 4px solid rgba(88,72,219,0.95); /* blue/purple gradient accent */
+  color: #FFFFFF;
+  box-shadow: 0 12px 30px rgba(43,128,255,0.12);
+}
+
+.sidebar-bottom { display:flex; flex-direction:column; gap:8px }
+
+/* compact icon-only mode for very small screens */
+/* Mobile: sidebar hidden by default and slides in */
+@media (max-width: 900px) {
+  .tfai-sidebar {
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 270px;
+    transform: translateX(-110%);
+    transition: transform 280ms ease;
+    border-radius: 0 12px 12px 0;
+    padding-top: 72px; /* keep space for top nav */
+  }
+
+  .tfai-sidebar.open { transform: translateX(0); }
+
+  .tfai-hamburger { position: fixed; left: 12px; top: 18px; z-index: 1200; background: rgba(2,6,23,0.6); border: 1px solid rgba(255,255,255,0.04); padding:8px; border-radius:8px; display:flex; align-items:center; justify-content:center }
+
+  /* compact labels hidden on very small screens when sidebar closed */
+  .tfai-sidebar .logo-text { display:block }
+  .sidebar-item .item-label { font-size:0.95rem }
+
+  /* when very narrow, hide labels in overlay mode if desired (kept visible here) */
+}
+
+/* When sidebar is visible on desktop, push the main analysis content to the right so it appears beside the sidebar
+   This mirrors the reference layout: left navigation column, right content area. */
+@media (min-width: 900px) {
+  /* Desktop: offset the main content to the right so it doesn't sit under the fixed sidebar */
+  .analysis-page {
+    margin-left: 240px; /* equal to sidebar width */
+    transition: margin-left 200ms ease;
+  }
+
+  /* make sure the hamburger is hidden on desktop */
+  .tfai-hamburger { display: none; }
+}
+

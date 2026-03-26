@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import ChatHistoryPanel from '../components/ChatHistoryPanel'
+import Sidebar from '../components/Sidebar'
 import CaseListModal from '../components/CaseListModal'
 import DynamicTable from '../components/DynamicTable'
 import ForceGraphView from '../components/ForceGraphView'
@@ -12,6 +13,10 @@ import RiskAlert from '../components/RiskAlert'
 import ReportCard from '../components/ReportCard'
 import SectionBlock from '../components/SectionBlock'
 import TimelineSlider from '../components/TimelineSlider'
+import DashboardPage from './DashboardPage'
+import UploadPage from './UploadPage'
+import ChatPage from './ChatPage'
+import ReportsPage from './ReportsPage'
 import {
   addHistoryItem,
   clearAllSessions,
@@ -228,6 +233,39 @@ function Analysis() {
   const remoteSpeakTokenRef = useRef(0)
   const translationCacheRef = useRef(new Map())
   const reportRef = useRef(null)
+
+  // navigation state (keeps lowercase keys per implementation requirement)
+  const [activeTab, setActiveTab] = useState('dashboard')
+
+  const tabToLabel = (tab) => {
+    switch (tab) {
+      case 'dashboard':
+        return 'Dashboard'
+      case 'upload':
+        return 'Upload Data'
+      case 'chat':
+        return 'AI Chat'
+      case 'reports':
+        return 'Reports / Analysis'
+      default:
+        return 'Dashboard'
+    }
+  }
+
+  const labelToTab = (label) => {
+    switch (label) {
+      case 'Dashboard':
+        return 'dashboard'
+      case 'Upload Data':
+        return 'upload'
+      case 'AI Chat':
+        return 'chat'
+      case 'Reports / Analysis':
+        return 'reports'
+      default:
+        return 'dashboard'
+    }
+  }
 
   const translateFromEnglishCached = async (text, language) => {
     const sourceText = (text || '').trim()
@@ -1076,6 +1114,7 @@ function Analysis() {
 
   return (
     <div className="analysis-page">
+  <Sidebar showTop={false} elevateBottom={true} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
       <div className="analysis-topbar">
         <h1>Forensic Data Analysis & AI Chat</h1>
         <div className="topbar-actions">
@@ -1085,211 +1124,75 @@ function Analysis() {
         </div>
       </div>
 
-      <section className="analysis-grid">
-        <article className="analysis-card">
-          <h2>Upload Dataset</h2>
-          {uploadMessage && (
-            <div className={uploadMessageType === 'success' ? 'success' : 'error'}>
-              {uploadMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleStartAnalysis}>
-            <div className="form-group">
-              <label htmlFor="datasetType">Dataset Type</label>
-              <select
-                id="datasetType"
-                value={datasetType}
-                onChange={handleDatasetTypeChange}
-                disabled={uploadLoading}
-              >
-                <option value="CDR">CDR (Call Detail Records)</option>
-                <option value="Tower">Tower Data</option>
-                <option value="IPDR">IPDR (IP Detail Records)</option>
-                <option value="Crime">Crime Scene Data</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="fileInput" className="file-input-label">
-                <p>Click to upload forensic dataset</p>
-                <p className="muted-text">
-                  {file ? `Selected: ${file.name}` : 'Excel files (.xlsx, .xls) supported'}
-                </p>
-                <input
-                  type="file"
-                  id="fileInput"
-                  onChange={handleFileChange}
-                  disabled={uploadLoading}
-                  accept=".xlsx,.xls"
-                />
-              </label>
-            </div>
-
-            <button type="submit" className="btn-primary" disabled={uploadLoading || !file}>
-              {uploadLoading ? 'Uploading...' : 'Upload Dataset'}
-            </button>
-          </form>
-        </article>
-
-        <article className="analysis-card">
-          <h2>AI Chat</h2>
-          <div className="command-buttons">
-            {COMMANDS.map((command) => (
-              <button
-                key={command.label}
-                type="button"
-                className="command-btn"
-                onClick={() => handleCommandClick(command.prompt)}
-              >
-                {command.label}
-              </button>
-            ))}
-          </div>
-          <ChatHistoryPanel history={chatHistory} />
-          <form className="chat-form" onSubmit={handleSendChat}>
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask: show movement of 1"
-              disabled={chatLoading}
-            />
-            <button
-              type="button"
-              className="btn-secondary mic-btn"
-              onClick={startSpeechToText}
-              disabled={chatLoading || isListening}
-            >
-              {isListening ? 'Listening...' : 'Mic'}
-            </button>
-            <button type="submit" className="btn-primary" disabled={chatLoading || !chatInput.trim()}>
-              {chatLoading ? 'Sending...' : 'Send'}
-            </button>
-          </form>
-          {chatError && <div className="error">{chatError}</div>}
-        </article>
-      </section>
-
-      <section className="analysis-results">
-        {!chatResponse && (
-          <div className="analysis-card">
-            <h2>Result</h2>
-            <p className="muted">Send a chat query to view analysis results.</p>
-          </div>
+      <section className="analysis-content">
+        {activeTab === 'dashboard' && (
+          <DashboardPage
+            totalRecords={Array.isArray(tableData) ? tableData.length : 0}
+            suspectsFound={suspectNumbers.length}
+            activeCases={savedCases.length}
+            recentActivity={historySessions}
+          />
         )}
 
-        {chatResponse && (
-          <div ref={reportRef}>
-            {caseMessage && (
-              <div className={caseMessageType === 'success' ? 'success' : 'error'} style={{ marginBottom: '16px' }}>{caseMessage}</div>
-            )}
-            <ReportCard
-              title={graphData ? 'Link Analysis Report' : 'Case Report'}
-              subtitle={resultPayload?.number ? `Subject: ${resultPayload.number}` : 'Telecom Forensic Intelligence'}
-            >
-              <div className="report-actions">
-                <div className="language-control report-language-control">
-                  <label htmlFor="reportLanguageSelector">Language</label>
-                  <select
-                    id="reportLanguageSelector"
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                  >
-                    {LANGUAGE_OPTIONS.map((lang) => (
-                      <option key={lang} value={lang}>
-                        {lang}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button type="button" className="btn-secondary" onClick={handleSaveCase}>
-                  Save Case
-                </button>
-                <button type="button" className="btn-secondary" onClick={handleOpenCaseModal}>
-                  Load Case
-                </button>
-                <button type="button" className="btn-secondary" onClick={handleOpenHistoryModal}>
-                  History
-                </button>
-                <button type="button" className="btn-secondary" onClick={handleExportPdf}>
-                  Export PDF
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary speak-btn"
-                  onClick={() => void handleSpeakLastResponse()}
-                  disabled={chatLoading || !reportSpeechText}
-                >
-                  Speak Report
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary stop-btn"
-                  onClick={handleStopSpeaking}
-                >
-                  Stop
-                </button>
-              </div>
+        {activeTab === 'upload' && (
+          <UploadPage
+            file={file}
+            datasetType={datasetType}
+            uploadLoading={uploadLoading}
+            uploadMessage={uploadMessage}
+            uploadMessageType={uploadMessageType}
+            handleFileChange={handleFileChange}
+            handleDatasetTypeChange={handleDatasetTypeChange}
+            handleStartAnalysis={handleStartAnalysis}
+            onOpenChat={() => setActiveTab('chat')}
+          />
+        )}
 
-              {hasStructuredSections ? (
-                <>
-                  <SectionBlock title={sectionLabels.keyObservations} items={localizedSections.keyObservations} />
-                  <SectionBlock title={sectionLabels.details} items={localizedSections.details} />
-                  <SectionBlock title={sectionLabels.nextSteps} items={localizedSections.nextSteps} />
-                </>
-              ) : (
-                <div className="explanation">
-                  <ReactMarkdown>{chatResponse.explanation}</ReactMarkdown>
-                </div>
-              )}
+        {activeTab === 'chat' && (
+          <ChatPage
+            COMMANDS={COMMANDS}
+            handleCommandClick={handleCommandClick}
+            chatHistory={chatHistory}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleSendChat={handleSendChat}
+            startSpeechToText={startSpeechToText}
+            isListening={isListening}
+            chatLoading={chatLoading}
+            chatError={chatError}
+            onBack={() => setActiveTab('upload')}
+            onGenerateReport={() => setActiveTab('reports')}
+          />
+        )}
 
-              <RiskAlert
-                riskLevel={resultPayload?.risk_level || 'LOW'}
-                reasons={resultPayload?.risk_reason || []}
-              />
-
-              {suspectNumbers.length > 0 && (
-                <div className="suspect-badges">
-                  <p className="suspect-title">Suspect Highlights</p>
-                  <div className="suspect-badge-wrap">
-                    {suspectNumbers.map((item) => (
-                      <span key={item} className="suspect-badge">{item}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <TimelineSlider
-                timeline={timelineData}
-                activeIndex={timelineIndex}
-                onChange={setTimelineIndex}
-              />
-
-              <MapView
-                towerData={{ towers: mapRows }}
-                crimeTowerId={crimeTowerId}
-                suspectTowers={suspectTowers}
-              />
-
-              {graphData && (
-                <ForceGraphView
-                  nodes={graphData.nodes}
-                  edges={graphData.edges}
-                  mainNumber={resultPayload?.number || ''}
-                  suspectNumbers={suspectNumbers}
-                />
-              )}
-
-              {Array.isArray(filteredTableData) && filteredTableData.length > 0 && (
-                <DynamicTable
-                  title={Array.isArray(resultPayload?.movement) ? 'Movement Timeline' : 'Data Table'}
-                  data={filteredTableData}
-                  suspectNumbers={suspectNumbers}
-                />
-              )}
-            </ReportCard>
-          </div>
+        {activeTab === 'reports' && (
+          <ReportsPage
+            chatResponse={chatResponse}
+            caseMessage={caseMessage}
+            caseMessageType={caseMessageType}
+            localizedSections={localizedSections}
+            hasStructuredSections={hasStructuredSections}
+            sectionLabels={sectionLabels}
+            selectedLanguage={selectedLanguage}
+            setSelectedLanguage={setSelectedLanguage}
+            handleSaveCase={handleSaveCase}
+            handleOpenCaseModal={handleOpenCaseModal}
+            handleOpenHistoryModal={handleOpenHistoryModal}
+            handleExportPdf={handleExportPdf}
+            handleSpeakLastResponse={handleSpeakLastResponse}
+            handleStopSpeaking={handleStopSpeaking}
+            reportSpeechText={reportSpeechText}
+            resultPayload={resultPayload}
+            graphData={graphData}
+            suspectNumbers={suspectNumbers}
+            timelineData={timelineData}
+            timelineIndex={timelineIndex}
+            setTimelineIndex={setTimelineIndex}
+            mapRows={mapRows}
+            filteredTableData={filteredTableData}
+            reportRef={reportRef}
+            languageOptions={LANGUAGE_OPTIONS}
+          />
         )}
       </section>
 
