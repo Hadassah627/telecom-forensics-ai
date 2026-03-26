@@ -239,6 +239,10 @@ function Analysis({ apiStatus }) {
   const reportRef = useRef(null)
   const [showReportInChat, setShowReportInChat] = useState(false)
 
+  // Save case modal state
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [saveCaseName, setSaveCaseName] = useState('')
+  const [saveCaseLoading, setSaveCaseLoading] = useState(false)
   // navigation state (keeps lowercase keys per implementation requirement)
   const [activeTab, setActiveTab] = useState('dashboard')
 
@@ -626,6 +630,7 @@ function Analysis({ apiStatus }) {
   }
 
   const handleSaveCase = async () => {
+    // Open a modal to ask for a case name instead of using window.prompt
     if (!chatResponse) {
       setCaseMessage('No case result to save yet.')
       setCaseMessageType('error')
@@ -633,12 +638,17 @@ function Analysis({ apiStatus }) {
     }
 
     const defaultName = `Case ${new Date().toLocaleString()}`
-    const userInput = window.prompt('Enter case name', defaultName)
-    const caseName = (userInput || '').trim()
+    setSaveCaseName(defaultName)
+    setSaveModalOpen(true)
+  }
+
+  const confirmSaveCase = async () => {
+    const caseName = (saveCaseName || '').trim()
     if (!caseName) {
       return
     }
 
+    setSaveCaseLoading(true)
     try {
       const payload = {
         name: caseName,
@@ -657,9 +667,14 @@ function Analysis({ apiStatus }) {
       await saveCase(payload)
       setCaseMessage(`Saved case: ${caseName}`)
       setCaseMessageType('success')
+      setSaveModalOpen(false)
+      // refresh saved cases list so user sees it in modal if opened later
+      fetchSavedCases().catch(() => {})
     } catch (error) {
       setCaseMessage(error.message || 'Failed to save case')
       setCaseMessageType('error')
+    } finally {
+      setSaveCaseLoading(false)
     }
   }
 
@@ -1281,6 +1296,37 @@ function Analysis({ apiStatus }) {
         onLoadCase={handleLoadCase}
         onRefresh={fetchSavedCases}
       />
+
+      {/* Save Case modal (inline, professional) */}
+      {saveModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Save case">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h3>Save Case</h3>
+              <button type="button" className="btn-secondary" onClick={() => setSaveModalOpen(false)}>Cancel</button>
+            </div>
+
+            <div style={{ marginTop: '8px' }}>
+              <label htmlFor="saveCaseName" style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)' }}>Enter case name</label>
+              <input
+                id="saveCaseName"
+                type="text"
+                value={saveCaseName}
+                onChange={(e) => setSaveCaseName(e.target.value)}
+                className="ai-chat-input"
+                style={{ width: '100%', borderRadius: '8px' }}
+              />
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '12px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn-secondary" onClick={() => setSaveModalOpen(false)} disabled={saveCaseLoading}>No</button>
+              <button type="button" className="btn-primary" onClick={confirmSaveCase} disabled={saveCaseLoading}>
+                {saveCaseLoading ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <HistoryModal
         isOpen={historyModalOpen}
