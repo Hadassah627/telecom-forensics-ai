@@ -72,7 +72,6 @@ export default function Sidebar({ initial = 'AI Chat', activeTab: activeProp, on
     { key: 'Dashboard', icon: 'dashboard' },
     { key: 'Upload Data', icon: 'upload' },
     { key: 'AI Chat', icon: 'chat' },
-    { key: 'Reports / Analysis', icon: 'reports' },
   ]
 
   return (

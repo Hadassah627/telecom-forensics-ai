@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -233,6 +234,7 @@ function Analysis({ apiStatus }) {
   const remoteSpeakTokenRef = useRef(0)
   const translationCacheRef = useRef(new Map())
   const reportRef = useRef(null)
+  const [showReportInChat, setShowReportInChat] = useState(false)
 
   // navigation state (keeps lowercase keys per implementation requirement)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -245,8 +247,6 @@ function Analysis({ apiStatus }) {
         return 'Upload Data'
       case 'chat':
         return 'AI Chat'
-      case 'reports':
-        return 'Reports / Analysis'
       default:
         return 'Dashboard'
     }
@@ -599,6 +599,7 @@ function Analysis({ apiStatus }) {
       nextSteps: [],
     })
     setTimelineIndex(0)
+    setShowReportInChat(false)
   }
 
   const handleLoadHistoryCard = (item) => {
@@ -618,6 +619,7 @@ function Analysis({ apiStatus }) {
     setHistoryModalOpen(false)
     setCaseMessage('Loaded report from history card')
     setCaseMessageType('success')
+    setShowReportInChat(true)
   }
 
   const handleSaveCase = async () => {
@@ -682,6 +684,7 @@ function Analysis({ apiStatus }) {
       setCaseMessage(`Loaded case: ${loadedCase.name}`)
       setCaseMessageType('success')
       setCaseModalOpen(false)
+      setShowReportInChat(true)
     } catch (error) {
       setCaseMessage(error.message || 'Failed to load case')
       setCaseMessageType('error')
@@ -1116,6 +1119,12 @@ function Analysis({ apiStatus }) {
     <div className="analysis-page">
       <Sidebar apiStatus={apiStatus} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
       <div className="analysis-topbar">
+        <Link to="/" className="back-btn" title="Back to Home">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span className="back-text">Back</span>
+        </Link>
         <h1>Forensic Data Analysis & AI Chat</h1>
         <div className="topbar-actions">
           <button type="button" className="btn-secondary" onClick={handleOpenCaseModal}>
@@ -1161,12 +1170,10 @@ function Analysis({ apiStatus }) {
             chatLoading={chatLoading}
             chatError={chatError}
             onBack={() => setActiveTab('upload')}
-            onGenerateReport={() => setActiveTab('reports')}
-          />
-        )}
-
-        {activeTab === 'reports' && (
-          <ReportsPage
+            onGenerateReport={() => setShowReportInChat(true)}
+            
+            // Report Props
+            showReport={showReportInChat}
             chatResponse={chatResponse}
             caseMessage={caseMessage}
             caseMessageType={caseMessageType}
