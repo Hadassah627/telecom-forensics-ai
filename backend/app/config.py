@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 
@@ -35,9 +36,33 @@ API_VERSION = "0.0.1"
 API_DESCRIPTION = "AI-powered forensic analysis API for telecommunications data"
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
+DEFAULT_CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+
+def _parse_cors_allowed_origins(value: str):
+    if not value:
+        return DEFAULT_CORS_ALLOWED_ORIGINS
+
+    value = value.strip()
+
+    # Render env is often provided as a JSON array string.
+    if value.startswith("["):
+        try:
+            parsed_origins = json.loads(value)
+            if isinstance(parsed_origins, list):
+                origins = [str(origin).strip() for origin in parsed_origins if str(origin).strip()]
+                return origins or DEFAULT_CORS_ALLOWED_ORIGINS
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback for comma-separated values.
+    origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+    return origins or DEFAULT_CORS_ALLOWED_ORIGINS
+
+
+CORS_ALLOWED_ORIGINS = _parse_cors_allowed_origins(os.getenv("CORS_ALLOWED_ORIGINS", ""))
