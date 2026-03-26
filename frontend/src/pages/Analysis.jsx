@@ -194,7 +194,7 @@ function toEpoch(value) {
   return Number.isFinite(maybeNumber) ? maybeNumber : null
 }
 
-function Analysis() {
+function Analysis({ apiStatus }) {
   const [file, setFile] = useState(null)
   const [datasetType, setDatasetType] = useState('CDR')
   const [uploadLoading, setUploadLoading] = useState(false)
@@ -1114,7 +1114,7 @@ function Analysis() {
 
   return (
     <div className="analysis-page">
-  <Sidebar showTop={false} elevateBottom={true} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
+      <Sidebar apiStatus={apiStatus} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
       <div className="analysis-topbar">
         <h1>Forensic Data Analysis & AI Chat</h1>
         <div className="topbar-actions">

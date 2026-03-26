@@ -26,15 +26,17 @@ function App() {
     }
   }
 
+  const isAnalysis = window.location.pathname === '/analysis'
+  
   return (
     <Router>
-      <div className="app">
+      <div className={`app ${isAnalysis ? 'analysis-layout' : ''}`}>
         <Navigation apiStatus={apiStatus} />
         <main>
           <div className="container">
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/analysis" element={<Analysis />} />
+              <Route path="/analysis" element={<Analysis apiStatus={apiStatus} />} />
             </Routes>
           </div>
         </main>

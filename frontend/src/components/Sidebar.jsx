@@ -54,13 +54,12 @@ function Icon({ name }) {
   }
 }
 
-export default function Sidebar({ initial = 'AI Chat', activeTab: activeProp, onChange, showTop = true, elevateBottom = false }) {
+export default function Sidebar({ initial = 'AI Chat', activeTab: activeProp, onChange, showTop = true, apiStatus }) {
   const [active, setActive] = useState(initial)
   const [open, setOpen] = useState(false)
-  // prefer controlled prop when provided
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const selected = activeProp || active
 
-  // close sidebar on route change or resize to desktop
   useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 900) setOpen(false)
@@ -78,71 +77,57 @@ export default function Sidebar({ initial = 'AI Chat', activeTab: activeProp, on
 
   return (
     <>
-      {/* mobile hamburger - visible on small screens */}
       <button
         className={`tfai-hamburger ${open ? 'open' : ''}`}
-        aria-label="Toggle navigation"
         onClick={() => setOpen((v) => !v)}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path className="h1" d="M4 7h16" stroke="#d9eefc" strokeWidth="1.6" strokeLinecap="round" />
-          <path className="h2" d="M4 12h16" stroke="#d9eefc" strokeWidth="1.6" strokeLinecap="round" />
-          <path className="h3" d="M4 17h16" stroke="#d9eefc" strokeWidth="1.6" strokeLinecap="round" />
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {open ? (
+            <path d="M18 6L6 18M6 6l12 12" />
+          ) : (
+            <>
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </>
+          )}
         </svg>
       </button>
 
-  <aside className={`tfai-sidebar ${open ? 'open' : ''} ${elevateBottom ? 'elevate-bottom' : ''}`} aria-label="Main navigation">
-      {showTop && (
+      <aside className={`tfai-sidebar ${open ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`} aria-label="Main navigation">
         <div className="sidebar-top">
-          <div className="logo-wrap">
-            <div className="logo-mark" aria-hidden>
-              {/* subtle mark */}
-              <svg viewBox="0 0 48 48" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="g1" x1="0" x2="1">
-                    <stop offset="0" stopColor="#2b80ff" />
-                    <stop offset="1" stopColor="#06b6d4" />
-                  </linearGradient>
-                </defs>
-                <rect x="6" y="6" width="36" height="36" rx="8" fill="url(#g1)" opacity="0.12" />
-                <path d="M14 30 L20 18 L28 32" stroke="#8fdcff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="logo-text">Telecom Forensics AI</div>
-          </div>
+          <button 
+            className="sidebar-toggle" 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            title={isCollapsed ? "Maximize Sidebar" : "Minimize Sidebar"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="5" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="19" r="1.5" fill="currentColor" />
+            </svg>
+          </button>
         </div>
-      )}
 
-      <nav className="sidebar-nav">
-            {items.map((it) => (
-              <button
-                key={it.key}
-                className={`sidebar-item ${selected === it.key ? 'active' : ''}`}
-                onClick={() => {
-                  if (onChange) onChange(it.key)
-                  else setActive(it.key)
-                  setOpen(false)
-                }}
-                type="button"
-                aria-current={selected === it.key}
-              >
-                <Icon name={it.icon} />
-                <span className="item-label">{it.key}</span>
-              </button>
-            ))}
-      </nav>
-
-      <div className="sidebar-bottom">
-        <button className="sidebar-item" type="button" aria-label="Settings">
-          <Icon name="settings" />
-          <span className="item-label">Settings</span>
-        </button>
-        <button className="sidebar-item" type="button" aria-label="Help">
-          <Icon name="help" />
-          <span className="item-label">Help</span>
-        </button>
-      </div>
-    </aside>
+        <nav className="sidebar-nav">
+          {items.map((it) => (
+            <button
+              key={it.key}
+              className={`sidebar-item ${selected === it.key ? 'active' : ''}`}
+              onClick={() => {
+                if (onChange) onChange(it.key)
+                else setActive(it.key)
+                setOpen(false)
+              }}
+              type="button"
+              title={isCollapsed ? it.key : ""}
+            >
+              <Icon name={it.icon} />
+              {!isCollapsed && <span className="item-label">{it.key}</span>}
+            </button>
+          ))}
+        </nav>
+      </aside>
     </>
   )
 }

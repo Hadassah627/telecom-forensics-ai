@@ -4,7 +4,7 @@ function Navigation({ apiStatus }) {
   const navigate = useNavigate()
 
   return (
-    <nav>
+    <nav className="global-nav">
       <div className="nav-brand">
         <img src="/ap_police.png" className="nav-logo" alt="AP Police" />
         <h1>
