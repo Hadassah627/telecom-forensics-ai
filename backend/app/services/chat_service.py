@@ -99,6 +99,9 @@ class ChatService:
         else:
             raise ValueError("Unsupported intent")
 
+        risk_data = AnalysisService.detect_risk(db, result)
+        result.update(risk_data)
+
         prompt = f"""
 You are a telecom forensic analysis assistant.
 
