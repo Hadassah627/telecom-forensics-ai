@@ -661,5 +661,6 @@ For issues, questions, or feature requests:
 
 
 **🎯 Version**: 2.0 (with risk detection, map, graph, timeline)
-**📅 Last Updated**: March 26, 2026
+
+**📅 Last Updated**: March 22, 2026
 **✨ Latest Release**: [See GitHub Releases]()
