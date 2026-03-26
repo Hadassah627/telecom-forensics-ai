@@ -5,8 +5,21 @@ function Navigation({ apiStatus }) {
 
   return (
     <nav>
-      <h1>Telecom Forensics AI</h1>
+      <div className="nav-brand">
+        <img src="/ap_police.png" className="nav-logo" alt="AP Police" />
+        <h1>
+          {"Telecom Forensics AI".split("").map((letter, index) => (
+            <span key={index} className="letter" style={{ animationDelay: `${index * 0.08}s` }}>
+              {letter === " " ? "\u00A0" : letter}
+            </span>
+          ))}
+        </h1>
+      </div>
       <div className="nav-buttons">
+        <div className="nav-links">
+          <a href="#about" className="nav-link">About Us</a>
+          <a href="#contact" className="nav-link">Contact Us</a>
+        </div>
         <div className={`api-status ${apiStatus}`}>
           {apiStatus === 'connected' && '✓ API Connected'}
           {apiStatus === 'disconnected' && '✗ API Disconnected'}
