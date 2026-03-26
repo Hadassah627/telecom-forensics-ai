@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -194,7 +195,7 @@ function toEpoch(value) {
   return Number.isFinite(maybeNumber) ? maybeNumber : null
 }
 
-function Analysis() {
+function Analysis({ apiStatus }) {
   const [file, setFile] = useState(null)
   const [datasetType, setDatasetType] = useState('CDR')
   const [uploadLoading, setUploadLoading] = useState(false)
@@ -236,6 +237,7 @@ function Analysis() {
   const remoteSpeakTokenRef = useRef(0)
   const translationCacheRef = useRef(new Map())
   const reportRef = useRef(null)
+  const [showReportInChat, setShowReportInChat] = useState(false)
 
   // navigation state (keeps lowercase keys per implementation requirement)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -248,8 +250,6 @@ function Analysis() {
         return 'Upload Data'
       case 'chat':
         return 'AI Chat'
-      case 'reports':
-        return 'Reports / Analysis'
       default:
         return 'Dashboard'
     }
@@ -602,6 +602,7 @@ function Analysis() {
       nextSteps: [],
     })
     setTimelineIndex(0)
+    setShowReportInChat(false)
   }
 
   const handleLoadHistoryCard = (item) => {
@@ -621,6 +622,7 @@ function Analysis() {
     setHistoryModalOpen(false)
     setCaseMessage('Loaded report from history card')
     setCaseMessageType('success')
+    setShowReportInChat(true)
   }
 
   const handleSaveCase = async () => {
@@ -685,6 +687,7 @@ function Analysis() {
       setCaseMessage(`Loaded case: ${loadedCase.name}`)
       setCaseMessageType('success')
       setCaseModalOpen(false)
+      setShowReportInChat(true)
     } catch (error) {
       setCaseMessage(error.message || 'Failed to load case')
       setCaseMessageType('error')
@@ -1117,8 +1120,14 @@ function Analysis() {
 
   return (
     <div className="analysis-page">
-  <Sidebar showTop={false} elevateBottom={true} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
+      <Sidebar apiStatus={apiStatus} activeTab={tabToLabel(activeTab)} onChange={(label) => setActiveTab(labelToTab(label))} />
       <div className="analysis-topbar">
+        <Link to="/" className="back-btn" title="Back to Home">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span className="back-text">Back</span>
+        </Link>
         <h1>Forensic Data Analysis & AI Chat</h1>
         <div className="topbar-actions">
           <button type="button" className="btn-secondary" onClick={handleOpenCaseModal}>
