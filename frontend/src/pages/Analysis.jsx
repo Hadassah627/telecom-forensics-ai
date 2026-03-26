@@ -1,12 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 import ChatHistoryPanel from '../components/ChatHistoryPanel'
+import CaseListModal from '../components/CaseListModal'
 import DynamicTable from '../components/DynamicTable'
-import GraphView from '../components/GraphView'
+import ForceGraphView from '../components/ForceGraphView'
+import HistoryModal from '../components/HistoryModal'
+import MapView from '../components/MapView'
 import ReportCard from '../components/ReportCard'
 import SectionBlock from '../components/SectionBlock'
-import { sendChatMessage, uploadDataset } from '../api/client'
-import { LANGUAGE_CODES, translateFromEnglish, translateToEnglish } from '../api/translate'
+import TimelineSlider from '../components/TimelineSlider'
+import {
+  addHistoryItem,
+  clearAllSessions,
+  createSession,
+  getSessionHistory,
+  listCases,
+  listSessions,
+  loadCase,
+  saveCase,
+  sendChatMessage,
+  uploadDataset,
+} from '../api/client'
+import { translateFromEnglish, translateToEnglish } from '../api/translate'
 
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada']
 const COMMANDS = [
@@ -146,6 +163,31 @@ function cleanMarkdownForChat(text = '') {
     .trim()
 }
 
+function extractTimeField(row = {}) {
+  return row.time || row.timestamp || row.date_time || row.datetime || null
+}
+
+function summarizeExplanation(explanation = '') {
+  const lines = String(explanation)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return lines.slice(0, 2).join(' ') || 'No summary available.'
+}
+
+function toEpoch(value) {
+  if (!value) {
+    return null
+  }
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) {
+    return date.getTime()
+  }
+  const maybeNumber = Number(value)
+  return Number.isFinite(maybeNumber) ? maybeNumber : null
+}
+
 function Analysis() {
   const [file, setFile] = useState(null)
   const [datasetType, setDatasetType] = useState('CDR')
@@ -163,13 +205,28 @@ function Analysis() {
     nextSteps: [],
   })
   const [chatError, setChatError] = useState('')
+  const [caseMessage, setCaseMessage] = useState('')
+  const [caseMessageType, setCaseMessageType] = useState('')
+  const [savedCases, setSavedCases] = useState([])
+  const [caseModalOpen, setCaseModalOpen] = useState(false)
+  const [casesLoading, setCasesLoading] = useState(false)
+  const [casesError, setCasesError] = useState('')
+  const [sessionId, setSessionId] = useState(null)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [historySessions, setHistorySessions] = useState([])
+  const [selectedHistorySessionId, setSelectedHistorySessionId] = useState(null)
+  const [historyItems, setHistoryItems] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('English')
+  const [timelineIndex, setTimelineIndex] = useState(0)
   const [isListening, setIsListening] = useState(false)
   const [voices, setVoices] = useState([])
   const recognitionRef = useRef(null)
   const currentAudioRef = useRef(null)
   const remoteSpeakTokenRef = useRef(0)
   const translationCacheRef = useRef(new Map())
+  const reportRef = useRef(null)
 
   const translateFromEnglishCached = async (text, language) => {
     const sourceText = (text || '').trim()
@@ -376,6 +433,25 @@ function Analysis() {
           text: cleanMarkdownForChat(englishExplanation) || 'No explanation returned.',
         },
       ])
+
+      let activeSessionId = sessionId
+      if (!activeSessionId) {
+        const created = await createSession('Investigation Session')
+        activeSessionId = created.session_id
+        setSessionId(activeSessionId)
+      }
+
+      await addHistoryItem({
+        session_id: activeSessionId,
+        query_text: message,
+        summary_text: summarizeExplanation(englishExplanation),
+        report_json: {
+          result: response.result || null,
+          explanation: englishExplanation,
+          rawEnglishExplanation: englishExplanation,
+          selectedLanguage,
+        },
+      })
     } catch (error) {
       setChatError(error.message || 'Failed to send message')
       setChatHistory((prev) => [
@@ -393,6 +469,214 @@ function Analysis() {
 
   const handleCommandClick = (prompt) => {
     setChatInput(prompt)
+  }
+
+  const fetchSavedCases = async () => {
+    setCasesLoading(true)
+    setCasesError('')
+    try {
+      const data = await listCases()
+      setSavedCases(Array.isArray(data) ? data : [])
+    } catch (error) {
+      setCasesError(error.message || 'Failed to load saved cases')
+    } finally {
+      setCasesLoading(false)
+    }
+  }
+
+  const handleOpenCaseModal = async () => {
+    setCaseModalOpen(true)
+    await fetchSavedCases()
+  }
+
+  const fetchHistorySessions = async () => {
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const sessions = await listSessions()
+      setHistorySessions(Array.isArray(sessions) ? sessions : [])
+      if (Array.isArray(sessions) && sessions.length > 0 && selectedHistorySessionId == null) {
+        setSelectedHistorySessionId(sessions[0].id)
+      }
+    } catch (error) {
+      setHistoryError(error.message || 'Failed to load sessions')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const handleOpenHistoryModal = async () => {
+    setHistoryModalOpen(true)
+    await fetchHistorySessions()
+  }
+
+  const handleSelectHistorySession = async (historySessionId) => {
+    setSelectedHistorySessionId(historySessionId)
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const items = await getSessionHistory(historySessionId)
+      setHistoryItems(Array.isArray(items) ? items : [])
+    } catch (error) {
+      setHistoryItems([])
+      setHistoryError(error.message || 'Failed to load session history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const handleClearAllSessions = async () => {
+    if (!window.confirm('Are you sure you want to delete all sessions and history? This cannot be undone.')) {
+      return
+    }
+
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      await clearAllSessions()
+      setHistorySessions([])
+      setSelectedHistorySessionId(null)
+      setHistoryItems([])
+      setCaseMessage('All sessions cleared successfully')
+      setCaseMessageType('success')
+    } catch (error) {
+      setHistoryError(error.message || 'Failed to clear sessions')
+      setCaseMessage(error.message || 'Failed to clear sessions')
+      setCaseMessageType('error')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const resetAiAnalysisState = () => {
+    setChatHistory([])
+    setChatInput('')
+    setChatError('')
+    setChatResponse(null)
+    setRawEnglishExplanation('')
+    setLocalizedSections({
+      keyObservations: [],
+      details: [],
+      nextSteps: [],
+    })
+    setTimelineIndex(0)
+  }
+
+  const handleLoadHistoryCard = (item) => {
+    const report = item?.report_json || {}
+
+    // Clear previous AI analysis data before applying a history report.
+    resetAiAnalysisState()
+
+    setChatResponse({
+      result: report.result || null,
+      explanation: report.explanation || '',
+    })
+    setRawEnglishExplanation(report.rawEnglishExplanation || report.explanation || '')
+    if (report.selectedLanguage) {
+      setSelectedLanguage(report.selectedLanguage)
+    }
+    setHistoryModalOpen(false)
+    setCaseMessage('Loaded report from history card')
+    setCaseMessageType('success')
+  }
+
+  const handleSaveCase = async () => {
+    if (!chatResponse) {
+      setCaseMessage('No case result to save yet.')
+      setCaseMessageType('error')
+      return
+    }
+
+    const defaultName = `Case ${new Date().toLocaleString()}`
+    const userInput = window.prompt('Enter case name', defaultName)
+    const caseName = (userInput || '').trim()
+    if (!caseName) {
+      return
+    }
+
+    try {
+      const payload = {
+        name: caseName,
+        data_json: {
+          resultPayload: chatResponse.result || null,
+          graphData,
+          tableData,
+        },
+        report_json: {
+          explanation: chatResponse.explanation || '',
+          rawEnglishExplanation,
+          localizedSections,
+          selectedLanguage,
+        },
+      }
+      await saveCase(payload)
+      setCaseMessage(`Saved case: ${caseName}`)
+      setCaseMessageType('success')
+    } catch (error) {
+      setCaseMessage(error.message || 'Failed to save case')
+      setCaseMessageType('error')
+    }
+  }
+
+  const handleLoadCase = async (caseId) => {
+    try {
+      const loadedCase = await loadCase(caseId)
+      const dataJson = loadedCase?.data_json || {}
+      const reportJson = loadedCase?.report_json || {}
+
+      const restoredResponse = {
+        result: dataJson.resultPayload || null,
+        explanation: reportJson.explanation || '',
+      }
+
+      setChatResponse(restoredResponse)
+      setRawEnglishExplanation(reportJson.rawEnglishExplanation || reportJson.explanation || '')
+      setLocalizedSections(
+        reportJson.localizedSections || {
+          keyObservations: [],
+          details: [],
+          nextSteps: [],
+        }
+      )
+      setSelectedLanguage(reportJson.selectedLanguage || 'English')
+      setCaseMessage(`Loaded case: ${loadedCase.name}`)
+      setCaseMessageType('success')
+      setCaseModalOpen(false)
+    } catch (error) {
+      setCaseMessage(error.message || 'Failed to load case')
+      setCaseMessageType('error')
+    }
+  }
+
+  const handleExportPdf = async () => {
+    if (!reportRef.current) {
+      return
+    }
+
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#0b1f3a',
+        ignoreElements: (el) =>
+          el.classList?.contains('leaflet-container') || el.classList?.contains('forensics-map'),
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height)
+      const imgWidth = canvas.width * ratio
+      const imgHeight = canvas.height * ratio
+
+      pdf.addImage(imgData, 'PNG', (pageWidth - imgWidth) / 2, 8, imgWidth, imgHeight)
+      pdf.save(`case-report-${Date.now()}.pdf`)
+    } catch (error) {
+      setCaseMessage(error.message || 'Failed to export PDF')
+      setCaseMessageType('error')
+    }
   }
 
   const startSpeechToText = () => {
@@ -522,28 +806,42 @@ function Analysis() {
 
   const playRemoteTTS = async (textChunks, selectedLangCode) => {
     const token = remoteSpeakTokenRef.current
-    for (const chunk of textChunks) {
-      if (token !== remoteSpeakTokenRef.current) {
-        return
-      }
+    let playedAnyChunk = false
 
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${selectedLangCode}&q=${encodeURIComponent(chunk)}`
+    const playChunk = async (chunk, clientType) => {
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=${clientType}&tl=${selectedLangCode}&q=${encodeURIComponent(chunk)}`
       const audio = new Audio(ttsUrl)
       currentAudioRef.current = audio
 
-      await new Promise((resolve) => {
-        audio.onended = () => resolve()
-        audio.onerror = () => resolve()
-        audio.play().catch(() => resolve())
+      return new Promise((resolve) => {
+        audio.onended = () => resolve(true)
+        audio.onerror = () => resolve(false)
+        audio.play().catch(() => resolve(false))
       })
+    }
+
+    for (const chunk of textChunks) {
+      if (token !== remoteSpeakTokenRef.current) {
+        return playedAnyChunk
+      }
+
+      let played = await playChunk(chunk, 'tw-ob')
+      if (!played) {
+        // Some regions/user agents reject tw-ob; gtx is a useful fallback.
+        played = await playChunk(chunk, 'gtx')
+      }
+
+      playedAnyChunk = playedAnyChunk || played
     }
 
     if (token === remoteSpeakTokenRef.current) {
       currentAudioRef.current = null
     }
+
+    return playedAnyChunk
   }
 
-  const speakText = (text) => {
+  const speakText = async (text) => {
     const cleanText = (text || '').trim()
     if (!cleanText || !window.speechSynthesis) {
       return
@@ -557,9 +855,11 @@ function Analysis() {
     stopRemoteAudio()
     window.speechSynthesis.cancel()
 
-    if (!bestVoice && selectedLanguage !== 'English') {
-      playRemoteTTS(chunks, targetLangCode)
-      return
+    if (selectedLanguage !== 'English') {
+      const remoteWorked = await playRemoteTTS(chunks, targetLangCode)
+      if (remoteWorked) {
+        return
+      }
     }
 
     for (const chunk of chunks) {
@@ -574,9 +874,27 @@ function Analysis() {
     }
   }
 
-  const handleSpeakLastResponse = () => {
-    const text = reportSpeechText
-    speakText(text)
+  const getSpeechTextForSelectedLanguage = async () => {
+    if (selectedLanguage === 'English') {
+      return reportSpeechText
+    }
+
+    if (hasStructuredSections && reportSpeechText) {
+      return reportSpeechText
+    }
+
+    const englishFallback = cleanMarkdownForChat(rawEnglishExplanation || reportSpeechText)
+    if (!englishFallback) {
+      return ''
+    }
+
+    const translated = await translateFromEnglishCached(englishFallback, selectedLanguage)
+    return translated || englishFallback
+  }
+
+  const handleSpeakLastResponse = async () => {
+    const text = await getSpeechTextForSelectedLanguage()
+    void speakText(text)
   }
 
   const handleStopSpeaking = () => {
@@ -622,6 +940,59 @@ function Analysis() {
     return []
   }, [resultPayload])
 
+  const timelinePoints = useMemo(() => {
+    const buckets = tableData
+      .map((row) => ({
+        raw: extractTimeField(row),
+        epoch: toEpoch(extractTimeField(row)),
+      }))
+      .filter((item) => item.raw && item.epoch !== null)
+      .sort((a, b) => a.epoch - b.epoch)
+
+    return Array.from(new Map(buckets.map((item) => [item.epoch, item.raw])).values())
+  }, [tableData])
+
+  useEffect(() => {
+    if (timelinePoints.length > 0) {
+      setTimelineIndex(timelinePoints.length - 1)
+    } else {
+      setTimelineIndex(0)
+    }
+  }, [timelinePoints])
+
+  useEffect(() => {
+    if (historyModalOpen && selectedHistorySessionId != null) {
+      handleSelectHistorySession(selectedHistorySessionId)
+    }
+  }, [historyModalOpen, selectedHistorySessionId])
+
+  const filteredTableData = useMemo(() => {
+    if (!tableData.length || !timelinePoints.length) {
+      return tableData
+    }
+
+    const activeTimeValue = timelinePoints[Math.min(timelineIndex, timelinePoints.length - 1)]
+    const activeEpoch = toEpoch(activeTimeValue)
+    if (activeEpoch === null) {
+      return tableData
+    }
+
+    return tableData.filter((row) => {
+      const rowEpoch = toEpoch(extractTimeField(row))
+      if (rowEpoch === null) {
+        return true
+      }
+      return rowEpoch <= activeEpoch
+    })
+  }, [tableData, timelinePoints, timelineIndex])
+
+  const mapRows = useMemo(() => {
+    if (filteredTableData.length) {
+      return filteredTableData
+    }
+    return tableData
+  }, [filteredTableData, tableData])
+
   const hasStructuredSections =
     localizedSections.keyObservations.length > 0 ||
     localizedSections.details.length > 0 ||
@@ -658,6 +1029,11 @@ function Analysis() {
     <div className="analysis-page">
       <div className="analysis-topbar">
         <h1>Forensic Data Analysis & AI Chat</h1>
+        <div className="topbar-actions">
+          <button type="button" className="btn-secondary" onClick={handleOpenCaseModal}>
+            Load Case
+          </button>
+        </div>
       </div>
 
       <section className="analysis-grid">
@@ -755,70 +1131,114 @@ function Analysis() {
         )}
 
         {chatResponse && (
-          <ReportCard
-            title={graphData ? 'Link Analysis Report' : 'Case Report'}
-            subtitle={resultPayload?.number ? `Subject: ${resultPayload.number}` : 'Telecom Forensic Intelligence'}
-          >
-            <div className="report-actions">
-              <div className="language-control report-language-control">
-                <label htmlFor="reportLanguageSelector">Language</label>
-                <select
-                  id="reportLanguageSelector"
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
+          <div ref={reportRef}>
+            {caseMessage && (
+              <div className={caseMessageType === 'success' ? 'success' : 'error'} style={{ marginBottom: '16px' }}>{caseMessage}</div>
+            )}
+            <ReportCard
+              title={graphData ? 'Link Analysis Report' : 'Case Report'}
+              subtitle={resultPayload?.number ? `Subject: ${resultPayload.number}` : 'Telecom Forensic Intelligence'}
+            >
+              <div className="report-actions">
+                <div className="language-control report-language-control">
+                  <label htmlFor="reportLanguageSelector">Language</label>
+                  <select
+                    id="reportLanguageSelector"
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                  >
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="button" className="btn-secondary" onClick={handleSaveCase}>
+                  Save Case
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleOpenCaseModal}>
+                  Load Case
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleOpenHistoryModal}>
+                  History
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleExportPdf}>
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary speak-btn"
+                  onClick={() => void handleSpeakLastResponse()}
+                  disabled={chatLoading || !reportSpeechText}
                 >
-                  {LANGUAGE_OPTIONS.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                  Speak Report
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary stop-btn"
+                  onClick={handleStopSpeaking}
+                >
+                  Stop
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn-secondary speak-btn"
-                onClick={handleSpeakLastResponse}
-                disabled={chatLoading || !reportSpeechText}
-              >
-                Speak Report
-              </button>
-              <button
-                type="button"
-                className="btn-secondary stop-btn"
-                onClick={handleStopSpeaking}
-              >
-                Stop
-              </button>
-            </div>
 
-            {hasStructuredSections ? (
-              <>
-                <SectionBlock title={sectionLabels.keyObservations} items={localizedSections.keyObservations} />
-                <SectionBlock title={sectionLabels.details} items={localizedSections.details} />
-                <SectionBlock title={sectionLabels.nextSteps} items={localizedSections.nextSteps} />
-              </>
-            ) : (
-              <div className="explanation">
-                <ReactMarkdown>{chatResponse.explanation}</ReactMarkdown>
-              </div>
-            )}
+              {hasStructuredSections ? (
+                <>
+                  <SectionBlock title={sectionLabels.keyObservations} items={localizedSections.keyObservations} />
+                  <SectionBlock title={sectionLabels.details} items={localizedSections.details} />
+                  <SectionBlock title={sectionLabels.nextSteps} items={localizedSections.nextSteps} />
+                </>
+              ) : (
+                <div className="explanation">
+                  <ReactMarkdown>{chatResponse.explanation}</ReactMarkdown>
+                </div>
+              )}
 
-            {Array.isArray(tableData) && tableData.length > 0 && (
-              <DynamicTable
-                title={Array.isArray(resultPayload?.movement) ? 'Movement Timeline' : 'Data Table'}
-                data={tableData}
+              <TimelineSlider
+                timeline={timelinePoints}
+                activeIndex={timelineIndex}
+                onChange={setTimelineIndex}
               />
-            )}
 
-            {graphData && (
-              <div className="result-block">
-                <h3>Graph View</h3>
-                <GraphView nodes={graphData.nodes} edges={graphData.edges} />
-              </div>
-            )}
-          </ReportCard>
+              <MapView rows={mapRows} />
+
+              {graphData && <ForceGraphView nodes={graphData.nodes} edges={graphData.edges} />}
+
+              {Array.isArray(filteredTableData) && filteredTableData.length > 0 && (
+                <DynamicTable
+                  title={Array.isArray(resultPayload?.movement) ? 'Movement Timeline' : 'Data Table'}
+                  data={filteredTableData}
+                />
+              )}
+            </ReportCard>
+          </div>
         )}
       </section>
+
+      <CaseListModal
+        isOpen={caseModalOpen}
+        onClose={() => setCaseModalOpen(false)}
+        cases={savedCases}
+        loading={casesLoading}
+        error={casesError}
+        onLoadCase={handleLoadCase}
+        onRefresh={fetchSavedCases}
+      />
+
+      <HistoryModal
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        sessions={historySessions}
+        selectedSessionId={selectedHistorySessionId}
+        historyItems={historyItems}
+        loading={historyLoading}
+        error={historyError}
+        onRefreshSessions={fetchHistorySessions}
+        onSelectSession={handleSelectHistorySession}
+        onLoadHistoryCard={handleLoadHistoryCard}
+        onClearAllSessions={handleClearAllSessions}
+      />
     </div>
   )
 }

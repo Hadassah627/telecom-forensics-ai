@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -61,3 +62,53 @@ class CrimeEvent(Base):
 
     def __repr__(self):
         return f"<CrimeEvent(crime={self.crime}, tower={self.tower}, time={self.time})>"
+
+
+class Case(Base):
+    """Saved analysis case snapshot model."""
+    __tablename__ = "cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    data_json = Column(JSON, nullable=False)
+    report_json = Column(JSON, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    def __repr__(self):
+        return f"<Case(id={self.id}, name={self.name})>"
+
+
+class Session(Base):
+    """Investigation chat session model."""
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    name = Column(String(255), nullable=False, index=True)
+
+    history_items = relationship(
+        "HistoryItem",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    def __repr__(self):
+        return f"<Session(id={self.id}, name={self.name})>"
+
+
+class HistoryItem(Base):
+    """Single query/result history entry tied to a session."""
+    __tablename__ = "history_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    query_text = Column(String(2000), nullable=False)
+    summary_text = Column(String(4000), nullable=False)
+    report_json = Column(JSON, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    session = relationship("Session", back_populates="history_items")
+
+    def __repr__(self):
+        return f"<HistoryItem(id={self.id}, session_id={self.session_id})>"
